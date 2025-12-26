@@ -32,16 +32,28 @@ python cli.py --odb-tgz <archive.tgz> --out-dir <output_folder>
 | `--render-size` | 8192 | Internal render size (higher = better quality) |
 | `--window-mm` | 40.0 | Crop window size around each component (mm) |
 | `--limit` | 0 | Limit number of components (0 = all) |
+| `--component` | *(none)* | Filter to single component by refdes (e.g., `C45`) |
+| `--pad` | *(none)* | Center crosshair on specific pad name (e.g., `1`) |
 
-### Example
+### Examples
 
 ```bash
-python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --out-dir out_modular
+# Generate all components
+python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --out-dir out_all
+
+# Generate single component centered on component origin
+python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --out-dir out --component C45
+
+# Generate single component with crosshair on pad 1
+python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --out-dir out --component C45 --pad 1
+
+# Generate all components with crosshair on pad 1 (falls back to center if pad not found)
+python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --out-dir out --pad 1
 ```
 
 ## Output
 
-- `<out-dir>/images/` — PNG images named `<refdes>_<face>.png`
+- `<out-dir>/images/` — PNG images named `<refdes>.png` or `<refdes>_pad<N>.png`
 - `<out-dir>/index.json` — Metadata index with component info
 
 ## Project Structure

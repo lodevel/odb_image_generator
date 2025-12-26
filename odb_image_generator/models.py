@@ -1,7 +1,7 @@
 """Data models for ODB++ image generator."""
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 
 @dataclass
@@ -16,6 +16,15 @@ class Symbol:
 
 
 @dataclass
+class Pin:
+    """Component pin/pad from ODB++ components file."""
+    name: str           # Pin name (e.g., "1", "2", "A1")
+    x_mm: float         # Absolute X position on board (not relative to component)
+    y_mm: float         # Absolute Y position on board (not relative to component)
+    rot_deg: float = 0.0  # Pin rotation
+
+
+@dataclass
 class Placement:
     """Component placement from ODB++ components file."""
     refdes: str
@@ -23,6 +32,19 @@ class Placement:
     y_mm: float
     rot_deg: float
     side: Literal["TOP", "BOTTOM"]
+    pins: List[Pin] = field(default_factory=list)
+
+    def get_pad_position(self, pad_name: str) -> Optional[Tuple[float, float]]:
+        """Get absolute position of a pad by name.
+        
+        ODB++ stores pin coordinates as absolute board positions.
+        Returns None if pad not found.
+        """
+        for pin in self.pins:
+            if pin.name == pad_name:
+                # Pin coordinates are already absolute in ODB++
+                return (pin.x_mm, pin.y_mm)
+        return None
 
 
 @dataclass
@@ -68,6 +90,8 @@ class Config:
     render_size: int = 8192
     window_mm: float = 40.0
     limit: int = 0  # 0 = no limit
+    component: Optional[str] = None  # Filter to single component refdes
+    pad: Optional[str] = None  # Center on specific pad name
 
     # Colors (RGBA)
     background_color: Tuple[int, int, int, int] = (0, 0, 0, 255)

@@ -82,3 +82,81 @@ def draw_side_banner(
     y = (banner_height - text_h) // 2
 
     draw.text((x, y), label, fill=(255, 255, 255, 255), font=font)
+
+
+def generate_404_image(
+    size: int,
+    reason: str,
+    bg_color: Tuple[int, int, int, int] = (40, 40, 40, 255),
+    text_color: Tuple[int, int, int, int] = (200, 60, 60, 255),
+) -> Image.Image:
+    """Generate a '404 Not Found' style error image.
+    
+    Args:
+        size: Image size in pixels (square)
+        reason: Error message to display (e.g., "Component C99 not found")
+        bg_color: Background color (RGBA)
+        text_color: Text color (RGBA)
+    
+    Returns:
+        PIL Image with 404 message
+    """
+    img = Image.new("RGBA", (size, size), bg_color)
+    draw = ImageDraw.Draw(img, "RGBA")
+
+    # Load fonts
+    try:
+        font_large = ImageFont.truetype("DejaVuSans-Bold.ttf", size // 6)
+        font_small = ImageFont.truetype("DejaVuSans.ttf", size // 24)
+    except Exception:
+        font_large = ImageFont.load_default()
+        font_small = font_large
+
+    # Draw "404" centered
+    text_404 = "404"
+    try:
+        bbox = draw.textbbox((0, 0), text_404, font=font_large)
+        w404 = bbox[2] - bbox[0]
+        h404 = bbox[3] - bbox[1]
+    except Exception:
+        w404, h404 = size // 3, size // 8
+
+    x404 = (size - w404) // 2
+    y404 = size // 3 - h404 // 2
+    draw.text((x404, y404), text_404, fill=text_color, font=font_large)
+
+    # Draw reason text below
+    try:
+        bbox = draw.textbbox((0, 0), reason, font=font_small)
+        w_reason = bbox[2] - bbox[0]
+        h_reason = bbox[3] - bbox[1]
+    except Exception:
+        w_reason, h_reason = size // 2, size // 16
+
+    x_reason = (size - w_reason) // 2
+    y_reason = size // 2 + size // 8
+    draw.text((x_reason, y_reason), reason, fill=(180, 180, 180, 255), font=font_small)
+
+    # Draw decorative X marks in corners
+    corner_margin = size // 10
+    cross_size = size // 20
+    corner_color = (100, 40, 40, 255)
+    
+    for cx, cy in [
+        (corner_margin, corner_margin),
+        (size - corner_margin, corner_margin),
+        (corner_margin, size - corner_margin),
+        (size - corner_margin, size - corner_margin),
+    ]:
+        draw.line(
+            [(cx - cross_size, cy - cross_size), (cx + cross_size, cy + cross_size)],
+            fill=corner_color,
+            width=3,
+        )
+        draw.line(
+            [(cx - cross_size, cy + cross_size), (cx + cross_size, cy - cross_size)],
+            fill=corner_color,
+            width=3,
+        )
+
+    return img
