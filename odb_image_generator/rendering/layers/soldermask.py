@@ -31,19 +31,46 @@ class SoldermaskLayer(Layer):
         
         Args:
             ctx: Render context
-            data: Soldermask layer data (features define openings)
+            data: Soldermask layer data (features define openings where mask is REMOVED)
             outline_pts: Board outline for mask boundary
+        
+        In ODB++, soldermask layer features represent OPENINGS (where mask is removed
+        to expose pads/copper). The board outline defines the base mask coverage.
+        
+        Surface features with I/H contours:
+        - I (Island) contours = openings (cut from mask)
+        - H (Hole) contours inside I = fill back (restore mask within the opening)
         """
         # Create alpha channel (L mode)
         alpha = Image.new("L", (ctx.render_size, ctx.render_size), 0)
         da = ImageDraw.Draw(alpha)
 
-        # Draw board area with mask alpha
+        # Start with board covered in soldermask
         if outline_pts and len(outline_pts) >= 3:
             board_poly = [ctx.mm_to_px(x, y) for x, y in outline_pts]
             da.polygon(board_poly, fill=self.mask_alpha)
 
-        # Cut out openings by drawing alpha=0
+        # Process features in correct order:
+        # 1. SURFACE features first (define large openings with fill-back regions)
+        # 2. Then P/L/A/POLY features (pad openings must cut through everything)
+        
+        # First pass: SURFACE features
+        for kind, feature_data in data.features:
+            if kind == "SURFACE":
+                # Surface features: I contours are openings, H contours fill back
+                polarity, contours = feature_data
+                if polarity == "P":  # Positive polarity
+                    for contour_kind, pts in contours:
+                        pts_px = [ctx.mm_to_px(x, y) for x, y in pts]
+                        if len(pts_px) >= 3:
+                            if contour_kind == "I":
+                                # Island = opening (cut from mask)
+                                da.polygon(pts_px, fill=0)
+                            elif contour_kind == "H":
+                                # Hole in opening = fill back (restore mask)
+                                da.polygon(pts_px, fill=self.mask_alpha)
+
+        # Second pass: P/L/A/POLY features (these must cut through H fill-backs too)
         for kind, feature_data in data.features:
             if kind == "P":
                 x, y, sym_id = feature_data
@@ -62,11 +89,11 @@ class SoldermaskLayer(Layer):
                 self._cut_arc(da, ctx, x1, y1, x2, y2, xc, yc, symbol)
 
             elif kind == "POLY":
+                # Standalone polygons are openings
                 poly_kind, pts = feature_data
-                if poly_kind == "I":  # Island
-                    pts_px = [ctx.mm_to_px(x, y) for x, y in pts]
-                    if len(pts_px) >= 3:
-                        da.polygon(pts_px, fill=0)
+                pts_px = [ctx.mm_to_px(x, y) for x, y in pts]
+                if len(pts_px) >= 3:
+                    da.polygon(pts_px, fill=0)
 
         # Create final mask image
         mask_img = Image.new("RGBA", (ctx.render_size, ctx.render_size), self.mask_color)

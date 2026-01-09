@@ -25,12 +25,19 @@ def iter_features(feature_txt: str) -> Generator[Tuple[str, Any], None, None]:
     - "P": (x, y, sym_id) - pad/flash
     - "L": (x1, y1, x2, y2, sym_id) - line
     - "A": (x1, y1, x2, y2, xc, yc, sym_id) - arc
-    - "POLY": (poly_kind, [(x,y), ...]) - polygon
+    - "POLY": (poly_kind, [(x,y), ...]) - polygon (standalone)
+    - "SURFACE": (polarity, contours) - surface feature with contours
+      where contours = [(poly_kind, [(x,y), ...]), ...]
     - "TEXT": (x, y, text_str) - text
     """
     in_poly = False
     poly_pts: List[Tuple[float, float]] = []
     poly_kind: Optional[str] = None
+    
+    # Surface tracking
+    in_surface = False
+    surface_polarity: Optional[str] = None
+    surface_contours: List[Tuple[str, List[Tuple[float, float]]]] = []
 
     for raw in feature_txt.splitlines():
         line = raw.strip()
@@ -48,6 +55,22 @@ def iter_features(feature_txt: str) -> Generator[Tuple[str, Any], None, None]:
         parts = core.split()
         token = parts[0]
 
+        # Surface start: S P|N dcode (polarity P=positive, N=negative)
+        if token == "S" and len(parts) >= 2:
+            in_surface = True
+            surface_polarity = parts[1]  # P or N
+            surface_contours = []
+            continue
+
+        # Surface end: SE
+        if token == "SE" and in_surface:
+            if surface_contours:
+                yield ("SURFACE", (surface_polarity, surface_contours))
+            in_surface = False
+            surface_polarity = None
+            surface_contours = []
+            continue
+
         # Polygon start: OB x y kind
         if token == "OB" and len(parts) >= 4:
             in_poly = True
@@ -62,7 +85,12 @@ def iter_features(feature_txt: str) -> Generator[Tuple[str, Any], None, None]:
 
         # Polygon end: OE
         if token == "OE" and in_poly:
-            yield ("POLY", (poly_kind, poly_pts))
+            if in_surface:
+                # Add to current surface
+                surface_contours.append((poly_kind, poly_pts))
+            else:
+                # Standalone polygon
+                yield ("POLY", (poly_kind, poly_pts))
             in_poly = False
             poly_pts = []
             poly_kind = None
