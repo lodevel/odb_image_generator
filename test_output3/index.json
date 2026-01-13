@@ -1,0 +1,34 @@
+[
+  {
+    "refdes": "C1_404",
+    "error": "component_not_found",
+    "requested": "C1",
+    "requested_pad": null,
+    "image_file": "images/C1_404.png"
+  },
+  {
+    "refdes": "R1",
+    "x_mm": 37.09999946,
+    "y_mm": 114.39999726,
+    "center_x_mm": 37.09999946,
+    "center_y_mm": 114.39999726,
+    "rotation_deg": 90.0,
+    "side": "BOTTOM",
+    "crop_window_mm": 40.0,
+    "pad": null,
+    "crop_box_mm": {
+      "xmin": 17.09999946,
+      "ymin": 94.39999726,
+      "xmax": 57.09999946,
+      "ymax": 134.39999726000002
+    },
+    "image_file": "images/R1.png"
+  },
+  {
+    "refdes": "C2_pad1_404",
+    "error": "component_not_found",
+    "requested": "C2",
+    "requested_pad": "1",
+    "image_file": "images/C2_pad1_404.png"
+  }
+]

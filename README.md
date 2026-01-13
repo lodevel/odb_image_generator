@@ -13,7 +13,7 @@ python -m venv .venv
 .\.venv\Scripts\activate
 
 # Install dependencies
-pip install Pillow
+pip install -r requirements.txt
 ```
 
 ## Usage
@@ -38,6 +38,20 @@ python cli.py --odb-tgz <archive.tgz> --out-dir <output_folder>
 | `--cross-arm-mm` | 1.5 | Crosshair arm half-length in mm |
 | `--cross-thickness-px` | 3 | Crosshair line thickness in pixels |
 
+### Performance Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--parallel-render` | enabled | Render TOP/BOTTOM board faces in parallel |
+| `--no-parallel-render` | — | Disable parallel layer rendering |
+| `--parallel-export` | enabled | Export components in parallel batches |
+| `--no-parallel-export` | — | Disable parallel component export |
+| `--max-workers` | 0 (auto) | Number of parallel workers (0=auto-detect based on CPU count, 1=sequential mode) |
+| `--batch-size` | 50 | Components per batch for memory management |
+| `--quiet` | false | Suppress progress output |
+
+**Note:** Parallel processing is enabled by default with auto-detected worker count. Use `--max-workers 1` to restore legacy sequential behavior for exact reproducibility. Parallel mode may produce images in different order than sequential mode, but output is deterministic within the same run.
+
 ### Examples
 
 ```bash
@@ -58,6 +72,15 @@ python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --out-dir out --target C45:1 --tar
 
 # Change crosshair size
 python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --out-dir out --component C45 --pad 1 --cross-arm-mm 2.5 --cross-thickness-px 5
+
+# Disable parallel processing (sequential mode)
+python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --out-dir out --max-workers 1
+
+# Quiet mode (no progress bar)
+python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --out-dir out --quiet
+
+# Custom batch size for memory-constrained systems
+python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --out-dir out --batch-size 25
 ```
 
 ## Output
@@ -70,8 +93,10 @@ python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --out-dir out --component C45 --pa
 ```
 odb_image_generator/
 ├── cli.py                      # CLI entry point
+├── requirements.txt            # Python dependencies
 ├── odb_image_generator/        # Main package
 │   ├── models.py               # Data classes
+│   ├── parallel.py             # Parallel processing utilities
 │   ├── parsing/                # ODB++ parsing
 │   │   ├── archive.py          # Archive extraction
 │   │   ├── profile.py          # Board outline parsing

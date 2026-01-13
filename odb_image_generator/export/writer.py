@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+from threading import Lock
 from typing import Dict, Any, List
 
 from PIL import Image
@@ -15,6 +16,7 @@ class ImageWriter:
         self.out_dir = Path(out_dir)
         self.img_dir = self.out_dir / "images"
         self._index: List[Dict[str, Any]] = []
+        self._lock = Lock()  # Thread-safe access to _index
 
         # Create directories
         self.out_dir.mkdir(parents=True, exist_ok=True)
@@ -41,13 +43,14 @@ class ImageWriter:
 
         img.save(filepath, "PNG")
 
-        # Build index entry
+        # Build index entry (thread-safe)
         entry = {
             "refdes": refdes,
             **metadata,
             "image_file": f"images/{filename}",
         }
-        self._index.append(entry)
+        with self._lock:
+            self._index.append(entry)
 
         return f"images/{filename}"
 
@@ -59,12 +62,16 @@ class ImageWriter:
         """
         index_path = self.out_dir / "index.json"
 
+        with self._lock:
+            data = list(self._index)  # Copy for thread safety
+
         with open(index_path, "w", encoding="utf-8") as f:
-            json.dump(self._index, f, indent=2)
+            json.dump(data, f, indent=2)
 
         return index_path
 
     @property
     def count(self) -> int:
-        """Number of images saved."""
-        return len(self._index)
+        """Number of images saved (thread-safe)."""
+        with self._lock:
+            return len(self._index)

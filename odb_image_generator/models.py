@@ -96,6 +96,13 @@ class Config:
     cross_arm_mm: float = 1.5
     cross_thickness_px: int = 3
 
+    # Parallel processing
+    parallel_render: bool = True   # Render TOP/BOTTOM faces in parallel
+    parallel_export: bool = True   # Export components in parallel batches
+    max_workers: int = 0           # 0 = auto-detect based on CPU count
+    batch_size: int = 50           # Components per batch (memory management)
+    quiet: bool = False            # Suppress progress output
+
     # Colors (RGBA)
     background_color: Tuple[int, int, int, int] = (0, 0, 0, 255)
     outline_color: Tuple[int, int, int, int] = (70, 70, 70, 255)
