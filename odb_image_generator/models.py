@@ -92,6 +92,9 @@ class Config:
     limit: int = 0  # 0 = no limit
     component: Optional[str] = None  # Filter to single component refdes
     pad: Optional[str] = None  # Center on specific pad name
+    targets: List[str] = field(default_factory=list)  # --target entries: REFDES or REFDES:PAD
+    cross_arm_mm: float = 1.5
+    cross_thickness_px: int = 3
 
     # Colors (RGBA)
     background_color: Tuple[int, int, int, int] = (0, 0, 0, 255)

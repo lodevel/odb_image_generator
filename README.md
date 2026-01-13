@@ -34,6 +34,9 @@ python cli.py --odb-tgz <archive.tgz> --out-dir <output_folder>
 | `--limit` | 0 | Limit number of components (0 = all) |
 | `--component` | *(none)* | Filter to single component by refdes (e.g., `C45`) |
 | `--pad` | *(none)* | Center crosshair on specific pad name (e.g., `1`) |
+| `--target` | *(none)* | Repeatable per-item export: `REFDES` or `REFDES:PAD` (e.g., `--target C45:1 --target R45`). Cannot be combined with `--component/--pad`. |
+| `--cross-arm-mm` | 1.5 | Crosshair arm half-length in mm |
+| `--cross-thickness-px` | 3 | Crosshair line thickness in pixels |
 
 ### Examples
 
@@ -49,6 +52,12 @@ python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --out-dir out --component C45 --pa
 
 # Generate all components with crosshair on pad 1 (falls back to center if pad not found)
 python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --out-dir out --pad 1
+
+# Generate a specific list of components (optionally centered on a pad)
+python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --out-dir out --target C45:1 --target R45 --target U7:3
+
+# Change crosshair size
+python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --out-dir out --component C45 --pad 1 --cross-arm-mm 2.5 --cross-thickness-px 5
 ```
 
 ## Output
