@@ -1,9 +1,0 @@
-[
-  {
-    "refdes": "C1_404",
-    "error": "component_not_found",
-    "requested": "C1",
-    "requested_pad": null,
-    "image_file": "images/C1_404.png"
-  }
-]

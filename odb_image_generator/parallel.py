@@ -73,7 +73,7 @@ class _DummyProgressBar:
 
 def get_optimal_workers() -> int:
     """Get optimal worker count based on CPU cores.
-    
+
     Returns CPU count for mixed I/O/CPU workloads typical of image processing.
     """
     return os.cpu_count() or 4
@@ -81,17 +81,17 @@ def get_optimal_workers() -> int:
 
 def batch_items(items: List[T], batch_size: int) -> Iterator[List[T]]:
     """Yield batches of items for memory-efficient processing.
-    
+
     Args:
         items: List of items to batch
         batch_size: Maximum items per batch (must be >= 1)
-        
+
     Yields:
         Lists of at most batch_size items
     """
     if batch_size < 1:
         batch_size = 1
-    
+
     for i in range(0, len(items), batch_size):
         yield items[i:i + batch_size]
 
@@ -102,24 +102,24 @@ def parallel_map(
     max_workers: int | None = None,
 ) -> List[R | None]:
     """Execute function on items in parallel using thread pool.
-    
+
     Uses ThreadPoolExecutor with context manager for automatic cleanup.
     Maintains order of results matching input items.
-    
+
     Args:
         func: Function to apply to each item
         items: List of items to process
         max_workers: Number of parallel workers (None = auto-detect)
-        
+
     Returns:
         List of results in same order as input items (None for failed items)
     """
     if not items:
         return []
-    
+
     if max_workers is None:
         max_workers = get_optimal_workers()
-    
+
     # Single-threaded fallback for max_workers=1 or single item
     if max_workers <= 1 or len(items) == 1:
         results: List[R | None] = []
@@ -130,16 +130,16 @@ def parallel_map(
                 safe_tqdm_write(f"Error processing item: {e}")
                 results.append(None)
         return results
-    
+
     results = [None] * len(items)
-    
+
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all tasks with index to maintain order
         future_to_idx = {
             executor.submit(func, item): idx
             for idx, item in enumerate(items)
         }
-        
+
         # Collect results as they complete
         for future in as_completed(future_to_idx):
             idx = future_to_idx[future]
@@ -149,5 +149,5 @@ def parallel_map(
                 # Log error but don't fail entire batch
                 safe_tqdm_write(f"Error processing item {idx}: {e}")
                 results[idx] = None
-    
+
     return results

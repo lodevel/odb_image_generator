@@ -4,6 +4,8 @@
 # Output directories
 out_*/
 
+test_output*/
+
 # Python cache
 __pycache__/
 *.pyc
