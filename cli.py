@@ -15,6 +15,7 @@ from odb_image_generator.rendering import (
     Compositor,
     BoardLayer,
     CopperLayer,
+    DrillLayer,
     SoldermaskLayer,
     SilkscreenLayer,
 )
@@ -259,6 +260,7 @@ def main() -> None:
         board = odb.parse_board()
         top_layers = odb.parse_layers("TOP")
         bot_layers = odb.parse_layers("BOTTOM")
+        drill_data = odb.parse_drill()
 
     # 2. Create render context
     ctx = RenderContext(board.bbox_mm, config.render_size)
@@ -267,18 +269,20 @@ def main() -> None:
     def render_face(side: str) -> Image.Image:
         """Render one board face with all layers."""
         layers = top_layers if side == "TOP" else bot_layers
-        return (
+        comp = (
             Compositor(ctx)
             .add(BoardLayer(config.background_color, config.outline_color), board)
             .add(CopperLayer(config.copper_color), layers.copper)
-            .add(
-                SoldermaskLayer(config.soldermask_color, config.soldermask_alpha),
-                layers.soldermask,
-                outline_pts=board.outline_pts,
-            )
-            .add(SilkscreenLayer(config.silkscreen_color), layers.silkscreen)
-            .render()
         )
+        if drill_data:
+            comp.add(DrillLayer(), drill_data)
+        comp.add(
+            SoldermaskLayer(config.soldermask_color, config.soldermask_alpha),
+            layers.soldermask,
+            outline_pts=board.outline_pts,
+        )
+        comp.add(SilkscreenLayer(config.silkscreen_color), layers.silkscreen)
+        return comp.render()
 
     if not config.quiet:
         safe_tqdm_write("Rendering board faces...")

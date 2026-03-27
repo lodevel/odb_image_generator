@@ -17,20 +17,22 @@ class BoardLayer(Layer):
         background_color: Tuple[int, int, int, int] = (0, 0, 0, 255),
         outline_color: Tuple[int, int, int, int] = (70, 70, 70, 255),
         outline_width: int = 2,
+        board_fill_color: Tuple[int, int, int, int] = (35, 55, 30, 255),
     ):
         self.background_color = background_color
         self.outline_color = outline_color
         self.outline_width = outline_width
+        self.board_fill_color = board_fill_color
 
     def render(self, ctx: RenderContext, data: Board) -> Image.Image:
         """Render board background and outline."""
         img = Image.new("RGBA", (ctx.render_size, ctx.render_size), self.background_color)
         draw = ImageDraw.Draw(img, "RGBA")
 
-        # Draw board polygon (filled with background)
+        # Draw board polygon filled with substrate/FR4 colour
         if len(data.outline_pts) >= 3:
             poly = [ctx.mm_to_px(x, y) for x, y in data.outline_pts]
-            draw.polygon(poly, fill=self.background_color)
+            draw.polygon(poly, fill=self.board_fill_color)
 
             # Draw outline
             draw.line(poly + [poly[0]], fill=self.outline_color, width=self.outline_width)
