@@ -55,10 +55,10 @@ class Cropper:
         """Convert mm box to pixel coordinates without clamping."""
         xmin, ymin, xmax, ymax = box_mm
 
-        x1 = int(round((xmin - self.ctx.xmin) / self.ctx.width_mm * (img.width - 1)))
-        x2 = int(round((xmax - self.ctx.xmin) / self.ctx.width_mm * (img.width - 1)))
-        y1 = int(round((self.ctx.ymax - ymax) / self.ctx.height_mm * (img.height - 1)))
-        y2 = int(round((self.ctx.ymax - ymin) / self.ctx.height_mm * (img.height - 1)))
+        x1 = self.ctx.mm_to_px_x(xmin)
+        x2 = self.ctx.mm_to_px_x(xmax)
+        y1 = self.ctx.mm_to_px_y(ymax)
+        y2 = self.ctx.mm_to_px_y(ymin)
 
         x1, x2 = sorted([x1, x2])
         y1, y2 = sorted([y1, y2])
