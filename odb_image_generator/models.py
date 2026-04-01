@@ -87,7 +87,7 @@ class Config:
     odb_path: str
     out_dir: str
     img_size: int = 1024
-    render_size: int = 8192
+    render_size: int = 4096
     window_mm: float = 40.0
     limit: int = 0  # 0 = no limit
     component: Optional[str] = None  # Filter to single component refdes
@@ -97,7 +97,7 @@ class Config:
     cross_thickness_px: int = 3
 
     # Parallel processing
-    parallel_render: bool = True   # Render TOP/BOTTOM faces in parallel
+    parallel_render: bool = False  # Render TOP/BOTTOM faces sequentially (parallel doubles peak memory)
     parallel_export: bool = True   # Export components in parallel batches
     max_workers: int = 0           # 0 = auto-detect based on CPU count
     batch_size: int = 50           # Components per batch (memory management)

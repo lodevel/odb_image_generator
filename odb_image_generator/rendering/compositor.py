@@ -39,7 +39,10 @@ class Compositor:
 
         for layer, data, kwargs in self._layers:
             layer_img = layer.render(self.ctx, data, **kwargs)
-            result = Image.alpha_composite(result, layer_img)
+            new_result = Image.alpha_composite(result, layer_img)
+            result.close()
+            layer_img.close()
+            result = new_result
 
         return result
 

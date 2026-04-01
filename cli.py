@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import gc
 from typing import Tuple, Dict, List
 
 from PIL import Image, ImageOps
@@ -15,6 +16,7 @@ from odb_image_generator.rendering import (
     Compositor,
     BoardLayer,
     CopperLayer,
+    DrillLayer,
     SoldermaskLayer,
     SilkscreenLayer,
 )
@@ -43,7 +45,7 @@ def parse_args() -> Config:
     ap.add_argument("--odb-tgz", required=True, help="Path to ODB++ .tgz archive")
     ap.add_argument("--out-dir", required=True, help="Output directory")
     ap.add_argument("--img-size", type=int, default=1024, help="Output image size (px)")
-    ap.add_argument("--render-size", type=int, default=8192, help="Internal render size (px)")
+    ap.add_argument("--render-size", type=int, default=4096, help="Internal render size (px)")
     ap.add_argument("--window-mm", type=float, default=40.0, help="Crop window size (mm)")
     ap.add_argument("--limit", type=int, default=0, help="Limit number of components (0=all)")
 
@@ -68,8 +70,8 @@ def parse_args() -> Config:
     perf_group.add_argument(
         "--parallel-render",
         action="store_true",
-        default=True,
-        help="Enable parallel layer rendering (default: enabled)",
+        default=False,
+        help="Enable parallel layer rendering (doubles peak memory)",
     )
     perf_group.add_argument(
         "--no-parallel-render",
@@ -259,6 +261,7 @@ def main() -> None:
         board = odb.parse_board()
         top_layers = odb.parse_layers("TOP")
         bot_layers = odb.parse_layers("BOTTOM")
+        drill_data = odb.parse_drill()
 
     # 2. Create render context
     ctx = RenderContext(board.bbox_mm, config.render_size)
@@ -267,18 +270,20 @@ def main() -> None:
     def render_face(side: str) -> Image.Image:
         """Render one board face with all layers."""
         layers = top_layers if side == "TOP" else bot_layers
-        return (
+        comp = (
             Compositor(ctx)
             .add(BoardLayer(config.background_color, config.outline_color), board)
             .add(CopperLayer(config.copper_color), layers.copper)
-            .add(
-                SoldermaskLayer(config.soldermask_color, config.soldermask_alpha),
-                layers.soldermask,
-                outline_pts=board.outline_pts,
-            )
-            .add(SilkscreenLayer(config.silkscreen_color), layers.silkscreen)
-            .render()
         )
+        if drill_data:
+            comp.add(DrillLayer(), drill_data)
+        comp.add(
+            SoldermaskLayer(config.soldermask_color, config.soldermask_alpha),
+            layers.soldermask,
+            outline_pts=board.outline_pts,
+        )
+        comp.add(SilkscreenLayer(config.silkscreen_color), layers.silkscreen)
+        return comp.render()
 
     if not config.quiet:
         safe_tqdm_write("Rendering board faces...")
@@ -379,8 +384,18 @@ def main() -> None:
             for img, filename, metadata in results:
                 if img is not None and filename is not None:
                     writer.save_image(img, filename, metadata)
+                if img is not None:
+                    img.close()
+            del results
+            gc.collect()
 
             pbar.update(len(batch))
+
+    # Free face images
+    top_img.close()
+    bot_img.close()
+    del face_imgs, top_img, bot_img
+    gc.collect()
 
     # Write index
     index_path = writer.write_index()
