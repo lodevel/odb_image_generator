@@ -27,9 +27,9 @@ python cli.py --odb-tgz <archive.tgz> --out-dir <output_folder>
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--odb-tgz` | *(required)* | Path to ODB++ `.tgz` archive |
-| `--out-dir` | *(required)* | Output directory for images |
+| `--out-dir` | *(required)* | Output directory for images (not required with `--list`) |
 | `--img-size` | 1024 | Output image size in pixels |
-| `--render-size` | 8192 | Internal render size (higher = better quality) |
+| `--render-size` | 4096 | Internal render size (higher = better quality) |
 | `--window-mm` | 40.0 | Crop window size around each component (mm) |
 | `--limit` | 0 | Limit number of components (0 = all) |
 | `--component` | *(none)* | Filter to single component by refdes (e.g., `C45`) |
@@ -38,11 +38,29 @@ python cli.py --odb-tgz <archive.tgz> --out-dir <output_folder>
 | `--cross-arm-mm` | 1.5 | Crosshair arm half-length in mm |
 | `--cross-thickness-px` | 3 | Crosshair line thickness in pixels |
 
+### Bulk Selection Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--all-components` | false | Render every component at its center (one image per refdes) |
+| `--all-pins` | false | Render every pin of every component (one image per pin) |
+
+**Note:** `--all-components` and `--all-pins` cannot be combined with each other or with `--component`, `--pad`, or `--target`. `--all-pins` cannot be combined with `--limit`.
+
+### Inspection Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--list` | false | List all components and pins as JSON to stdout (no rendering) |
+| `--list-file` | *(none)* | Write component list JSON to file (implies `--list`) |
+
+**Note:** `--list` does not require `--out-dir`. When used, no images are rendered.
+
 ### Performance Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--parallel-render` | enabled | Render TOP/BOTTOM board faces in parallel |
+| `--parallel-render` | disabled | Render TOP/BOTTOM board faces in parallel |
 | `--no-parallel-render` | — | Disable parallel layer rendering |
 | `--parallel-export` | enabled | Export components in parallel batches |
 | `--no-parallel-export` | — | Disable parallel component export |
@@ -81,12 +99,25 @@ python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --out-dir out --quiet
 
 # Custom batch size for memory-constrained systems
 python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --out-dir out --batch-size 25
+
+# List all components and their pins (JSON to stdout, no rendering)
+python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --list
+
+# List components and write to file
+python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --list --list-file components.json
+
+# Generate all components (one image per component, centered on component origin)
+python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --out-dir out --all-components
+
+# Generate all pins of all components (one image per pin)
+python cli.py --odb-tgz CE_FLAME-DETECTOR.tgz --out-dir out --all-pins
 ```
 
 ## Output
 
 - `<out-dir>/images/` — PNG images named `<refdes>.png` or `<refdes>_pad<N>.png`
 - `<out-dir>/index.json` — Metadata index with component info
+- `--list` output — JSON array to stdout: `[{"refdes", "side", "pins": [...]}]`
 
 ## Project Structure
 

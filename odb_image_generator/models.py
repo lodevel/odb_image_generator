@@ -85,7 +85,7 @@ class FaceLayers:
 class Config:
     """Configuration for image generation."""
     odb_path: str
-    out_dir: str
+    out_dir: Optional[str] = None
     img_size: int = 1024
     render_size: int = 4096
     window_mm: float = 40.0
@@ -93,6 +93,10 @@ class Config:
     component: Optional[str] = None  # Filter to single component refdes
     pad: Optional[str] = None  # Center on specific pad name
     targets: List[str] = field(default_factory=list)  # --target entries: REFDES or REFDES:PAD
+    all_components: bool = False  # Render every component at its center
+    all_pins: bool = False        # Render every pin of every component
+    list_components: bool = False  # List components/pins as JSON (no rendering)
+    list_file: Optional[str] = None  # Write component list JSON to file
     cross_arm_mm: float = 1.5
     cross_thickness_px: int = 3
 

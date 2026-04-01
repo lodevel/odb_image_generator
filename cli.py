@@ -5,11 +5,15 @@ from __future__ import annotations
 
 import argparse
 import gc
+import json
+import re
+import sys
+from dataclasses import replace
 from typing import Tuple, Dict, List
 
 from PIL import Image, ImageOps
 
-from odb_image_generator.models import Config, Placement
+from odb_image_generator.models import Board, Config, Placement
 from odb_image_generator.parsing import OdbArchive
 from odb_image_generator.rendering import (
     RenderContext,
@@ -36,6 +40,154 @@ from odb_image_generator.parallel import (
 )
 
 
+# ---------------------------------------------------------------------------
+# Helpers for --list, --all-components, --all-pins
+# ---------------------------------------------------------------------------
+
+def _natural_sort_key(text: str) -> list:
+    """Sort key for natural ordering (R1, R2, R10 instead of R1, R10, R2).
+
+    Splits *text* into alternating non-digit / digit groups so that
+    numeric sub-strings are compared by value rather than lexicographically.
+    """
+    parts: list = []
+    for match in re.finditer(r"(\d+)|(\D+)", text):
+        if match.group(1):
+            parts.append(("", int(match.group(1))))
+        else:
+            parts.append((match.group(2), 0))
+    return parts
+
+
+def _build_component_list(board: Board) -> list:
+    """Return a sorted list of ``{refdes, side, pins}`` dicts for the board."""
+    components = []
+    for placement in board.placements:
+        pin_names = sorted(
+            (pin.name for pin in placement.pins),
+            key=_natural_sort_key,
+        )
+        components.append({
+            "refdes": placement.refdes,
+            "side": placement.side,
+            "pins": pin_names,
+        })
+    components.sort(key=lambda c: _natural_sort_key(c["refdes"]))
+    return components
+
+
+def _output_component_list(board: Board, list_file: str | None) -> None:
+    """Print component/pin listing as JSON to stdout.
+
+    Always writes machine-readable JSON to stdout.  When *list_file* is
+    given the same JSON is also written to that path (status printed to
+    stderr so it doesn't pollute the JSON stream).
+    """
+    components = _build_component_list(board)
+    json_str = json.dumps(components, indent=2)
+
+    if list_file:
+        try:
+            with open(list_file, "w", encoding="utf-8") as f:
+                f.write(json_str)
+            print(f"Component list written to: {list_file}", file=sys.stderr)
+        except OSError as exc:
+            print(f"ERROR: Failed to write {list_file}: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+    print(json_str)
+
+
+def _generate_all_targets(
+    placements: List[Placement],
+    all_pins: bool,
+    limit: int = 0,
+) -> List[str]:
+    """Build target specs for ``--all-components`` or ``--all-pins``.
+
+    Expands bulk selection flags into the explicit ``REFDES`` /
+    ``REFDES:PAD`` strings consumed by the ``--target`` pipeline.
+
+    When *limit* is non-zero and *all_pins* is ``False`` the list is
+    truncated to the first *limit* components.
+    """
+    targets: List[str] = []
+    for placement in placements:
+        if not all_pins and limit and len(targets) >= limit:
+            break
+        if all_pins:
+            # Components with no pins are silently skipped
+            for pin in sorted(placement.pins, key=lambda p: _natural_sort_key(p.name)):
+                targets.append(f"{placement.refdes}:{pin.name}")
+        else:
+            targets.append(placement.refdes)
+    return targets
+
+
+def _parse_target_spec(raw: str) -> List[Tuple[str, str | None]]:
+    """Parse a single ``--target`` value into ``(refdes, pad|None)`` pairs.
+
+    Supports comma-separated lists: ``"C45:1,R1"`` → ``[("C45","1"),("R1",None)]``.
+    """
+    specs: List[Tuple[str, str | None]] = []
+    for item in (part.strip() for part in raw.split(",")):
+        if not item:
+            continue
+        refdes, sep, pad = item.partition(":")
+        refdes = refdes.strip()
+        pad = pad.strip() if sep else ""
+        specs.append((refdes, pad if sep else None))
+    return specs
+
+
+# ---------------------------------------------------------------------------
+# Argument parsing & validation
+# ---------------------------------------------------------------------------
+
+def _validate_args(ap: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """Validate parsed CLI arguments, calling ``ap.error()`` on failure."""
+    # --list-file implies --list
+    if args.list_file:
+        args.list_components = True
+
+    # --list doesn't require --out-dir; everything else does
+    if not args.list_components and not args.out_dir:
+        ap.error("--out-dir is required (unless using --list)")
+
+    # Mutual exclusion: only one selection mode at a time
+    active_modes = [
+        name
+        for flag, name in [
+            (bool(args.target), "--target"),
+            (bool(args.component or args.pad), "--component/--pad"),
+            (args.all_components, "--all-components"),
+            (args.all_pins, "--all-pins"),
+        ]
+        if flag
+    ]
+    if len(active_modes) > 1:
+        ap.error(f"Cannot combine selection modes: {' and '.join(active_modes)}")
+
+    # --all-pins renders everything; --limit contradicts that
+    if args.all_pins and args.limit:
+        ap.error("--all-pins cannot be combined with --limit (all means all)")
+
+    if args.cross_arm_mm <= 0:
+        ap.error("--cross-arm-mm must be > 0")
+    if args.cross_thickness_px <= 0:
+        ap.error("--cross-thickness-px must be > 0")
+    if args.batch_size < 1:
+        ap.error("--batch-size must be >= 1")
+
+    # Validate --target syntax early
+    for raw in args.target:
+        for refdes, pad in _parse_target_spec(raw):
+            if not refdes:
+                ap.error(f"Invalid --target entry (empty refdes): '{raw}'")
+            if pad is not None and not pad:
+                ap.error(f"Invalid --target entry (missing pad after ':'): '{raw}'")
+
+
 def parse_args() -> Config:
     """Parse command line arguments and return Config."""
     ap = argparse.ArgumentParser(
@@ -43,7 +195,7 @@ def parse_args() -> Config:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     ap.add_argument("--odb-tgz", required=True, help="Path to ODB++ .tgz archive")
-    ap.add_argument("--out-dir", required=True, help="Output directory")
+    ap.add_argument("--out-dir", default=None, help="Output directory for images (not required with --list)")
     ap.add_argument("--img-size", type=int, default=1024, help="Output image size (px)")
     ap.add_argument("--render-size", type=int, default=4096, help="Internal render size (px)")
     ap.add_argument("--window-mm", type=float, default=40.0, help="Crop window size (mm)")
@@ -59,6 +211,37 @@ def parse_args() -> Config:
         action="append",
         default=[],
         help="Repeatable target spec: REFDES or REFDES:PAD (e.g., --target C45:1). Commas allowed.",
+    )
+
+    # Bulk selection modes
+    bulk_group = ap.add_argument_group("bulk selection", "Generate images for all components or all pins")
+    bulk_group.add_argument(
+        "--all-components",
+        action="store_true",
+        default=False,
+        help="Render every component at its center (one image per refdes)",
+    )
+    bulk_group.add_argument(
+        "--all-pins",
+        action="store_true",
+        default=False,
+        help="Render every pin of every component (one image per pin)",
+    )
+
+    # Inspection
+    inspect_group = ap.add_argument_group("inspection", "Inspect board data without rendering")
+    inspect_group.add_argument(
+        "--list",
+        dest="list_components",
+        action="store_true",
+        default=False,
+        help="List all components and their pins as JSON to stdout (no rendering)",
+    )
+    inspect_group.add_argument(
+        "--list-file",
+        type=str,
+        default=None,
+        help="Write component list JSON to file (implies --list)",
     )
 
     # Crosshair sizing
@@ -111,29 +294,7 @@ def parse_args() -> Config:
     )
 
     args = ap.parse_args()
-
-    if args.target and (args.component or args.pad):
-        ap.error("--target cannot be combined with --component/--pad (use --target REFDES or REFDES:PAD)")
-
-    if args.cross_arm_mm <= 0:
-        ap.error("--cross-arm-mm must be > 0")
-
-    if args.cross_thickness_px <= 0:
-        ap.error("--cross-thickness-px must be > 0")
-
-    if args.batch_size < 1:
-        ap.error("--batch-size must be >= 1")
-
-    # Validate target syntax early (argparse-style errors)
-    for raw in args.target:
-        for item in (p.strip() for p in raw.split(",")):
-            if not item:
-                continue
-            refdes, sep, pad = item.partition(":")
-            if not refdes.strip():
-                ap.error(f"Invalid --target entry: '{item}'")
-            if sep and not pad.strip():
-                ap.error(f"Invalid --target entry (missing pad): '{item}'")
+    _validate_args(ap, args)
 
     return Config(
         odb_path=args.odb_tgz,
@@ -145,6 +306,10 @@ def parse_args() -> Config:
         component=args.component,
         pad=args.pad,
         targets=args.target,
+        all_components=args.all_components,
+        all_pins=args.all_pins,
+        list_components=args.list_components,
+        list_file=args.list_file,
         cross_arm_mm=args.cross_arm_mm,
         cross_thickness_px=args.cross_thickness_px,
         parallel_render=args.parallel_render,
@@ -259,6 +424,12 @@ def main() -> None:
     # 1. Parse ODB++ archive
     with OdbArchive(config.odb_path) as odb:
         board = odb.parse_board()
+
+        # --list: output component listing and exit (no rendering)
+        if config.list_components:
+            _output_component_list(board, config.list_file)
+            return
+
         top_layers = odb.parse_layers("TOP")
         bot_layers = odb.parse_layers("BOTTOM")
         drill_data = odb.parse_drill()
@@ -300,33 +471,40 @@ def main() -> None:
     writer = ImageWriter(config.out_dir)
     face_imgs = {"TOP": top_img, "BOTTOM": bot_img}
 
+    # Expand --all-components / --all-pins into explicit target list.
+    # --limit is applied here for --all-components to avoid generating
+    # unused targets; --all-pins disallows --limit (validated earlier).
+    if config.all_components or config.all_pins:
+        generated = _generate_all_targets(
+            board.placements, config.all_pins, limit=config.limit,
+        )
+        config = replace(config, targets=generated)
+        if not config.quiet:
+            mode = "all-pins" if config.all_pins else "all-components"
+            safe_tqdm_write(f"Generated {len(config.targets)} targets ({mode})")
+
+    # Build lookup for resolving --target refdes strings
     placements_by_refdes: dict[str, list] = {}
     for p in board.placements:
         placements_by_refdes.setdefault(p.refdes, []).append(p)
 
-    def iter_target_specs() -> List[Tuple[str, str | None]]:
-        specs: List[Tuple[str, str | None]] = []
-        for raw in config.targets:
-            for item in (part.strip() for part in raw.split(",")):
-                if not item:
-                    continue
-                refdes, sep, pad = item.partition(":")
-                refdes = refdes.strip()
-                pad = pad.strip() if sep else ""
-                specs.append((refdes, pad if sep else None))
-        return specs
-
-    # Build export task list: (placement, pad, strict_pad)
+    # ---- Build export task list: (placement, pad, strict_pad) ----
+    # Two paths converge here:
+    #   1. Explicit targets (--target, --all-components, --all-pins)
+    #   2. Legacy mode (--component / --pad, or bare invocation)
     export_tasks: List[Tuple[Placement, str | None, bool]] = []
 
     if config.targets:
-        for refdes, pad in iter_target_specs():
+        for refdes, pad in (
+            pair
+            for raw in config.targets
+            for pair in _parse_target_spec(raw)
+        ):
             if config.limit and len(export_tasks) >= config.limit:
                 break
 
             placement_list = placements_by_refdes.get(refdes)
             if not placement_list:
-                # Handle missing component immediately
                 img_404 = generate_404_image(
                     config.img_size,
                     f"Component {refdes} not found",
@@ -336,7 +514,7 @@ def main() -> None:
                 writer.save_image(img_404, out_name, metadata)
                 continue
 
-            # If multiple matches exist, export the first one
+            # If multiple placements share a refdes, export the first one
             export_tasks.append((placement_list[0], pad, bool(pad)))
 
     else:
