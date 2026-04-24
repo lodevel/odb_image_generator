@@ -201,18 +201,6 @@ def parse_args() -> Config:
     ap.add_argument("--window-mm", type=float, default=40.0, help="Crop window size (mm)")
     ap.add_argument("--limit", type=int, default=0, help="Limit number of components (0=all)")
 
-    # Legacy selection (keep for backwards compatibility)
-    ap.add_argument("--component", type=str, default=None, help="Filter to single component refdes (e.g., C45)")
-    ap.add_argument("--pad", type=str, default=None, help="Center crosshair on pad name (e.g., 1)")
-
-    # New selection mode: per-target list, optional per-target pad
-    ap.add_argument(
-        "--target",
-        action="append",
-        default=[],
-        help="Repeatable target spec: REFDES or REFDES:PAD (e.g., --target C45:1). Commas allowed.",
-    )
-
     # Bulk selection modes
     bulk_group = ap.add_argument_group("bulk selection", "Generate images for all components or all pins")
     bulk_group.add_argument(
@@ -226,6 +214,19 @@ def parse_args() -> Config:
         action="store_true",
         default=False,
         help="Render every pin of every component (one image per pin)",
+    )
+
+    # Selection mode
+    select_group = ap.add_argument_group("selection mode", "Select specific components or pins to render")
+    # Legacy selection (keep for backwards compatibility)
+    select_group.add_argument("--component", type=str, default=None, help="Filter to single component refdes (e.g., C45)")
+    select_group.add_argument("--pad", type=str, default=None, help="Center crosshair on pad name (e.g., 1)")
+    # Per-target list, optional per-target pad
+    select_group.add_argument(
+        "--target",
+        action="append",
+        default=[],
+        help="Repeatable target spec: REFDES or REFDES:PAD (e.g., --target C45:1). Commas allowed.",
     )
 
     # Inspection
@@ -244,9 +245,10 @@ def parse_args() -> Config:
         help="Write component list JSON to file (implies --list)",
     )
 
-    # Crosshair sizing
-    ap.add_argument("--cross-arm-mm", type=float, default=1.5, help="Crosshair arm half-length (mm)")
-    ap.add_argument("--cross-thickness-px", type=int, default=3, help="Crosshair line thickness (px)")
+    # Rendering options
+    render_group = ap.add_argument_group("rendering", "Crosshair annotation and output options")
+    render_group.add_argument("--cross-arm-mm", type=float, default=1.5, help="Crosshair arm half-length (mm)")
+    render_group.add_argument("--cross-thickness-px", type=int, default=3, help="Crosshair line thickness (px)")
 
     # Performance options
     perf_group = ap.add_argument_group("performance", "Parallel processing and performance options")

@@ -32,11 +32,6 @@ python cli.py --odb-tgz <archive.tgz> --out-dir <output_folder>
 | `--render-size` | 4096 | Internal render size (higher = better quality) |
 | `--window-mm` | 40.0 | Crop window size around each component (mm) |
 | `--limit` | 0 | Limit number of components (0 = all) |
-| `--component` | *(none)* | Filter to single component by refdes (e.g., `C45`) |
-| `--pad` | *(none)* | Center crosshair on specific pad name (e.g., `1`) |
-| `--target` | *(none)* | Repeatable per-item export: `REFDES` or `REFDES:PAD` (e.g., `--target C45:1 --target R45`). Cannot be combined with `--component/--pad`. |
-| `--cross-arm-mm` | 1.5 | Crosshair arm half-length in mm |
-| `--cross-thickness-px` | 3 | Crosshair line thickness in pixels |
 
 ### Bulk Selection Options
 
@@ -47,6 +42,14 @@ python cli.py --odb-tgz <archive.tgz> --out-dir <output_folder>
 
 **Note:** `--all-components` and `--all-pins` cannot be combined with each other or with `--component`, `--pad`, or `--target`. `--all-pins` cannot be combined with `--limit`.
 
+### Selection Mode Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--component` | *(none)* | Filter to single component by refdes (e.g., `C45`) |
+| `--pad` | *(none)* | Center crosshair on specific pad name (e.g., `1`) |
+| `--target` | *(none)* | Repeatable per-item export: `REFDES` or `REFDES:PAD` (e.g., `--target C45:1 --target R45`). Cannot be combined with `--component/--pad`. |
+
 ### Inspection Options
 
 | Option | Default | Description |
@@ -55,6 +58,13 @@ python cli.py --odb-tgz <archive.tgz> --out-dir <output_folder>
 | `--list-file` | *(none)* | Write component list JSON to file (implies `--list`) |
 
 **Note:** `--list` does not require `--out-dir`. When used, no images are rendered.
+
+### Rendering Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--cross-arm-mm` | 1.5 | Crosshair arm half-length in mm |
+| `--cross-thickness-px` | 3 | Crosshair line thickness in pixels |
 
 ### Performance Options
 
