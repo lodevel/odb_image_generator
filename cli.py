@@ -21,6 +21,7 @@ from odb_image_generator.rendering import (
     RenderContext,
     Compositor,
     BoardLayer,
+    CutoutLayer,
     CopperLayer,
     DrillLayer,
     SoldermaskLayer,
@@ -770,7 +771,7 @@ def _process_component_export(
 
 # Bump when anything that changes rendered-face pixels changes (layer styling,
 # colors, compositing order) — it invalidates cached face renders.
-RENDER_STYLE_VERSION = 1
+RENDER_STYLE_VERSION = 2
 
 
 def _face_cache_path(config: Config, side: str) -> Path:
@@ -832,6 +833,8 @@ def render_board_face(config: Config, ctx, board, layers, drill_data):
         outline_pts=board.outline_pts,
     )
     comp.add(SilkscreenLayer(config.silkscreen_color), layers.silkscreen)
+    if board.cutouts:
+        comp.add(CutoutLayer(config.background_color, config.outline_color), board)
     return comp.render()
 
 

@@ -11,7 +11,12 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from ..models import Board, FaceLayers, LayerData, Placement
-from .profile import parse_profile_outline, compute_bbox_from_pts
+from .profile import (
+    compute_bbox_from_pts,
+    parse_profile_holes,
+    parse_profile_outline,
+)
+from .rout import parse_rout_chains, rout_cutouts
 from .components import parse_components_file
 from .nets import parse_eda_nets
 from .features import parse_layer_data
@@ -174,7 +179,26 @@ class OdbArchive:
             bbox_mm=bbox_mm,
             placements=placements,
             net_names=self.parse_nets(),
+            cutouts=(parse_profile_holes(profile_txt)
+                     + self.parse_rout_cutouts(outline_pts)),
         )
+
+    def parse_rout_cutouts(self, outline_pts) -> list:
+        """Closed cutouts milled inside *outline_pts*, read from every
+        ``TYPE=ROUT`` layer of the matrix (``[]`` when there is none)."""
+        try:
+            matrix_txt = self._matrix()
+        except FileNotFoundError:
+            return []
+        cutouts: list = []
+        for layer in _layers_by_type(_parse_matrix_layers(matrix_txt), "ROUT"):
+            path = f"odb/steps/pcb/layers/{layer['NAME'].lower()}/features"
+            try:
+                txt = self._read_text(path)
+            except FileNotFoundError:
+                continue
+            cutouts.extend(rout_cutouts(parse_rout_chains(txt), outline_pts))
+        return cutouts
 
     def parse_nets(self) -> list[str]:
         """Net names from the EDA netlist, indexed by net number. Returns ``[]``

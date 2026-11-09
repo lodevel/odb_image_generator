@@ -59,6 +59,9 @@ class Board:
     bbox_mm: Tuple[float, float, float, float]  # xmin, ymin, xmax, ymax
     placements: List[Placement] = field(default_factory=list)
     net_names: List[str] = field(default_factory=list)  # net_num -> net name (EDA)
+    # Holes through the board inside the outline (profile H contours + closed
+    # rout-layer chains), each a closed polygon in mm.
+    cutouts: List[List[Tuple[float, float]]] = field(default_factory=list)
 
     @property
     def width_mm(self) -> float:

@@ -1,7 +1,11 @@
 # ODB++ Component Image Generator
 
 Generates per-component PCB images from ODB++ archives with layer stacking:
-**Board → Copper → Soldermask (with openings) → Silkscreen → Annotations**
+**Board → Copper → Drill → Soldermask (with openings) → Silkscreen → Cutouts → Annotations**
+
+Cutouts are holes through the board inside its outline: hole (`H`) contours of
+the profile, and closed chains of the rout layer (`TYPE=ROUT`) that lie inside
+the outline.
 
 ## Installation
 
@@ -130,7 +134,8 @@ odb_image_generator/
 │   ├── parallel.py             # Parallel processing utilities
 │   ├── parsing/                # ODB++ parsing
 │   │   ├── archive.py          # Archive extraction
-│   │   ├── profile.py          # Board outline parsing
+│   │   ├── profile.py          # Board outline + hole contours (profile)
+│   │   ├── rout.py             # Cutouts milled on the rout layer
 │   │   ├── components.py       # Component placement parsing
 │   │   ├── symbols.py          # Symbol definitions (pads)
 │   │   └── features.py         # Feature primitives (P/L/A/POLY/TEXT)
@@ -140,6 +145,7 @@ odb_image_generator/
 │   │   └── layers/             # Layer renderers
 │   │       ├── board.py        # Board outline
 │   │       ├── copper.py       # Copper pads
+│   │       ├── cutout.py       # Board cutouts (drawn last)
 │   │       ├── soldermask.py   # Soldermask with openings
 │   │       └── silkscreen.py   # Silkscreen/legend
 │   └── export/                 # Export utilities
