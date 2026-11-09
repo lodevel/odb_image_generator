@@ -1,0 +1,19 @@
+# Virtual environment
+.venv/
+
+# Output directories
+out_*/
+
+test_output*/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# ODB++ archives (large files)
+*.tgz
+
+# IDE
+.vscode/
+.idea/
